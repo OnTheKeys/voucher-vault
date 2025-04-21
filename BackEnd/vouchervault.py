@@ -7,6 +7,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver import ActionChains 
 from selenium.webdriver.remote.webelement import WebElement
 import logging
+import os
 
 from flask import Flask, request
 from flask_cors import CORS
@@ -20,9 +21,9 @@ app = Flask(__name__)
 CORS(app)
 
 #Selenium Browser Driver setup.
-PATH = Service(path_to_driver)
+PATH = Service(os.environ['PATH_TO_DRIVER'])
 options = Options()
-options.binary_location = path_to_binary
+options.binary_location = os.environ['PATH_TO_BINARY']
 
 #Misc setup.
 global_driver = None
