@@ -16,3 +16,16 @@ class item(ABC):
         self.link = link
         self.quantity = quantity
         
+    def __eq__(self, other: object) -> bool:
+        """Function to determine equality.
+
+        Args:
+            other (object): Object to be compared to.
+
+        Returns:
+            bool: True if equal, false otherwise.
+        """
+        if not isinstance(other, item):
+            return False     
+        return (self.link == other.link and self.quantity == other.quantity)
+        

@@ -25,4 +25,18 @@ class arnotts_user(user):
         """
         super().__init__(email, title, first_name, last_name, phone_number, country, addr_line1, addr_line2, town_city, county, eircode)
         self.delivery = delivery
+    
+    def __eq__(self, other: object) -> bool:
+        """Function to determine equality.
+
+        Args:
+            other (object): Object to be compared to.
+
+        Returns:
+            bool: True if equal, false otherwise.
+        """
+        if not isinstance(other, arnotts_user):
+            return False
+        
+        return (super().__eq__(other) and self.delivery == other.delivery)
         

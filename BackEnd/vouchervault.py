@@ -16,33 +16,23 @@ from arnotts_user import arnotts_user
 import time
 import re
 
-#Flask Setup.
-app = Flask(__name__)
-CORS(app)
-
 #Selenium Browser Driver setup.
 PATH = Service(os.environ['PATH_TO_DRIVER'])
 options = Options()
 options.binary_location = os.environ['PATH_TO_BINARY']
 
+class Driver():
+    def __new__(cls):
+        if not hasattr(cls, 'instance'):
+            cls.instance = webdriver.Firefox(service=PATH, options=options)
+        return cls.instance
+            
+
+#Flask Setup.
+app = Flask(__name__)
+CORS(app)
 #Misc setup.
-global_driver = None
 logger = logging.getLogger(__name__)
-
-
-
-
-def driver_init():
-    """Function to Ensures that the driver is singleton.
-    """
-    global global_driver
-    if not global_driver:
-       global_driver= webdriver.Firefox(service=PATH, options=options)
-       return global_driver
-    else:
-        return global_driver
-
-
 """
 Group of functions that make the repeated use of specific time sleep values slightly more intuitive to read
 """
@@ -51,25 +41,20 @@ def short_pause():
     
 def medium_pause():
     time.sleep(3)
-
 def long_pause():
     time.sleep(7)
-      
+    
 def alternative_click(driver, element: WebElement):
     """A function for using the alternative method of clicking in selenium. 
         Useful if the main method of clicking doesnt work.
-
     Args:
         driver (WebDriver): The web driver the element is being clicked in.
         element (WebElement): The element to be clicked.
     """
     driver.execute_script("arguments[0].click();", element)
-
-
 def offset_scroll(driver, value =240, multiplier=-1):
     """The element locations on the Arnotts website seem to be offset on the Y axis. 
     This function helps scroll against this offset, fixing an error where the element scrolled to is not on screen.
-
     Args:
         driver (WebDriver): The driver the scrolling is happening in.
         value (int, optional): The amount to be scrolled in the Y direction. Defaults to 240.
@@ -83,7 +68,6 @@ def offset_scroll(driver, value =240, multiplier=-1):
     except IndexError as e:
         logger.error(f"Invalid coordinates: {e}")
         
-
 def handle_arnotts_button(wait: WebDriverWait):
     """Function to handle the cookies button that pops up when the storefront is first visited.
     
@@ -97,15 +81,13 @@ def handle_arnotts_button(wait: WebDriverWait):
         element.click()
     except AttributeError as e: 
         logger.error(f"Button not found: {e}")
-       
+    
 def match_size(item: arnotts_item, size: WebElement, driver):
     """Function to match the size of an item with a given size on the website.
-
     Args:
         item (arnotts_item): The item with a size to be matched.
         size (WebElement): A dropdown WebElement containing a size.
         driver (WebDriver): The web driver the function should run using.
-
     Returns:
         Boolean: True if size matches, false if it does not.
     """
@@ -129,13 +111,10 @@ def match_size(item: arnotts_item, size: WebElement, driver):
         size.click()
         return True
     return False
-
 def find_sizes(driver):
     """Function that retrieves all possible sizes for an certain on screen item from the Arnotts website.
-
     Args:
         driver (WebDriver): The web driver the sizes are to be found in.
-
     Returns:
         list [WebElement]: Returns a list of the available sizes in strings.
     """
@@ -150,22 +129,16 @@ def find_sizes(driver):
         i+=1
         
     return dropdowns
-
-
 def get_giftcard():
     """Incomplete function. 
     Would fetch an apprproiate gift card from the database if we had giftcards to store.
-
     Returns:
         gift_card(str): Gift card number as string. Hardcoded for now.
     """
     gift_card = "12345678910"
     return gift_card
-
-
 def enter_user_details_arnotts(driver, user: arnotts_user):
     """Takes in a driver and a user then fills the user's details into the arnotts form
-
     Args:
         driver (WebDriver): The web driver in use.
         user (arnotts_user): The user object the details will be extracted from.
@@ -184,17 +157,15 @@ def enter_user_details_arnotts(driver, user: arnotts_user):
     dropdown.find_element(By.XPATH, f"//option[. = '{user.county}']").click()
     driver.find_element(By.NAME, "postcode").send_keys(user.eircode)
     short_pause()
-      
-
+    
 def arnotts_order(cart : list [arnotts_item], user : arnotts_user):
     """A function that places an order on the Arnotts Website
-
     Args:
         cart (list [arnotts_item]): A list of arnotts items to be ordered.
         user (arnotts_user): The Arnotts user the items are ordered for.
     """
     #Initliazises the driver if it has not already been initialized
-    driver = driver_init()
+    driver = Driver()
     long_wait = WebDriverWait(driver, 10)
     
     for i, item in enumerate(cart):
@@ -210,7 +181,7 @@ def arnotts_order(cart : list [arnotts_item], user : arnotts_user):
         element = long_wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "size-name  ")))
         element.location_once_scrolled_into_view
         
-        #A short pause to allow the scrolling to be completed
+        #A medium pause to allow the scrolling to be completed
         medium_pause()
         #The element location on the arnotts website seems to be offset so scroll back up in the opposite direction.
         offset_scroll(driver)
@@ -232,7 +203,7 @@ def arnotts_order(cart : list [arnotts_item], user : arnotts_user):
         #Change item quantity to quantity specified by user.  
         for _ in range(1, int(item.quantity)):
             driver.find_element(By.CSS_SELECTOR, ".add-qty").click()
-    	
+        
         #Adds item to cart.
         element= driver.find_element(By.CLASS_NAME, "addToBagLoader")
         ActionChains(driver)\
@@ -271,27 +242,34 @@ def arnotts_order(cart : list [arnotts_item], user : arnotts_user):
     driver.find_element(By.CSS_SELECTOR, ".paygiftcard__textfield").send_keys(get_giftcard())
     return "Success", 200 
 
-@app.route("/arnotts", methods=['POST', 'GET'])
-def arnotts():
-    """Function to handle creating a new WebDriver and ordering from arnotts when a request is recieved.
 
-    Returns:
-        HTTP Response: Response from arnotts_order function.
-    """
-    if request.method == 'POST':
-        cart = []
-    
-    #Filling in cart details. 
-    for line in request.json['cart']['items']:
+def arnotts_json_to_order(json):
+    cart = []
+        #Filling in cart details. 
+    for line in json['cart']['items']:
         item = arnotts_item(line['link'], line['quantity'], line['size'].split(',')[-1].strip())
         cart.append(item)
     
     #Filling in user details.
-    user_details = request.json['user']
+    user_details = json['user']
     user = arnotts_user(user_details["email"], user_details["title"], user_details["firstName"], user_details["lastName"], user_details["phoneNumber"], user_details["country"], user_details["addrLine1"], user_details["addrLine2"], user_details["townCity"], user_details["county"], user_details["eircode"], user_details['delivery'])
+    print(cart)
+    print(user)
+    return cart, user
+    
+@app.route("/arnotts", methods=['POST', 'GET'])
+def arnotts():
+    """Function to handle creating a new WebDriver and ordering from arnotts when a request is recieved.
+    Returns:
+        HTTP Response: Response from arnotts_order function.
+    """
+
+    if request.method == 'POST':
+        cart, user = arnotts_json_to_order(request.json)
     
     return arnotts_order(cart, user)
-    
+
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", debug=True)

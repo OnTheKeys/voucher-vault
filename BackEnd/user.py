@@ -33,3 +33,30 @@ class user(ABC):
         self.town_city = town_city
         self.county = county
         self.eircode = eircode
+    
+    def __eq__(self, other: object) -> bool:
+        """Function to determine equality.
+
+        Args:
+            other (object): Object to be compared to.
+
+        Returns:
+            bool: True if equal, false otherwise.
+        """
+        if not isinstance(other, user):
+            return False
+        
+        return (self.email == other.email and
+            self.title == other.title and 
+            self.first_name == other.first_name and 
+            self.last_name == other.last_name and 
+            self.phone_number == other.phone_number and
+            self.country == other.country and 
+            self.addr_line1 == other.addr_line1 and
+            self.addr_line2 == other.addr_line2 and
+            self.town_city == other.town_city and
+            self.county == other.county and
+            self.eircode == other.eircode)
+                
+            
+    
