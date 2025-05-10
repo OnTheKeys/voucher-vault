@@ -6,7 +6,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver import ActionChains 
 from selenium.webdriver.remote.webelement import WebElement
+from selenium.common.exceptions import TimeoutException
+from contextlib import suppress
 import logging
+from threading import Event, Lock
 import os
 
 from flask import Flask, request
@@ -15,16 +18,25 @@ from arnotts_item import arnotts_item
 from arnotts_user import arnotts_user
 import time
 import re
+from multiprocessing import Process, cpu_count
 
 #Selenium Browser Driver setup.
+
 PATH = Service(os.environ['PATH_TO_DRIVER'])
 options = Options()
 options.binary_location = os.environ['PATH_TO_BINARY']
 
+#Multithreading driver event and lock setup
+driver_free = Event()
+driver_free.set()
+driver_lock = Lock()
+
+
 class Driver():
     def __new__(cls):
-        if not hasattr(cls, 'instance'):
-            cls.instance = webdriver.Firefox(service=PATH, options=options)
+        with driver_lock:
+            if not hasattr(cls, 'instance'):
+                cls.instance = webdriver.Firefox(service=PATH, options=options)
         return cls.instance
             
 
@@ -165,16 +177,26 @@ def arnotts_order(cart : list [arnotts_item], user : arnotts_user):
         user (arnotts_user): The Arnotts user the items are ordered for.
     """
     #Initliazises the driver if it has not already been initialized
+    
     driver = Driver()
+    #Thread waits until the driver is free and then clears the driver free flag.
+    #letting other threads know the driver is unavailable.
+    driver_free.wait()
+    driver_free.clear()
+    
+    #Defines a long wait time for the driver. 
+    #This gives the driver what is essentially a timeout waiting for an event.
     long_wait = WebDriverWait(driver, 10)
     
     for i, item in enumerate(cart):
         #Navigates to the webpage of the item
         driver.get(item.link)
         
-        #Handles the cookies button if this is the first item.
+        #Handles the cookies button if this is the first arnotts page visited.
+        #If it never shows up and the time set to wait times out the process continues
         if i == 0:
-            handle_arnotts_button(long_wait)
+            with suppress(TimeoutException):
+                handle_arnotts_button(long_wait)
         
         #Wait for the size selection button to be clickable after handling cookie button.
         #Then scroll to the "location" of the size button.     
@@ -240,6 +262,9 @@ def arnotts_order(cart : list [arnotts_item], user : arnotts_user):
     medium_pause()
     #Enter gift card into pay with gift card field.
     driver.find_element(By.CSS_SELECTOR, ".paygiftcard__textfield").send_keys(get_giftcard())
+    
+    #Signals driver is free again before returning.
+    driver_free.set()
     return "Success", 200 
 
 
